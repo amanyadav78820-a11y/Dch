@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 from datetime import datetime
+import plotly.express as px
 
 # Page Configuration
 st.set_page_config(page_title="Monthly Budget & Savings Planner", page_icon="💰", layout="wide")
@@ -59,6 +60,7 @@ def load_data():
     df = pd.read_csv(DATA_FILE)
     if not df.empty:
         df["Amount"] = pd.to_numeric(df["Amount"], errors='coerce')
+        df["Amount"] = df["Amount"].fillna(0.0)
     return df
 
 def save_data(month_sheet, type_, amount, category, desc, date):
@@ -67,30 +69,110 @@ def save_data(month_sheet, type_, amount, category, desc, date):
     df = pd.concat([df, new_row], ignore_index=True)
     df.to_csv(DATA_FILE, index=False)
 
-# --- SIDEBAR NAVIGATION ---
-st.sidebar.markdown("<h2>🧭 Navigation</h2>", unsafe_allow_html=True)
-page_selection = st.sidebar.radio("Go to Page:", ["📝 Monthly Dashboard", "🔍 All Time History & Search"])
+# --- LANGUAGE DICTIONARY ---
+lang_dict = {
+    "English": {
+        "nav_title": "🧭 Navigation",
+        "nav_dash": "📝 Monthly Dashboard",
+        "nav_hist": "🔍 All Time History & Search",
+        "title": "💰 Personal Monthly Budget Tracker",
+        "select_month": "📅 Which Month's Account to View?",
+        "new_month": "🆕 Start New Month",
+        "new_month_btn": "➕ New Month Page",
+        "new_month_input": "Type Month-Year (e.g. Dec-2026):",
+        "create_btn": "Create Sheet",
+        "active_sheet": "📊 Active Sheet:",
+        "bal_status": "💵 Balance Status (This Month)",
+        "total_inc": "💰 Total Income",
+        "total_exp": "📉 Total Expense",
+        "total_sav": "🏦 Set Aside Savings",
+        "clear_bal": "📊 Clear Balance (Available to spend)",
+        "new_entry": "📝 Add New Entry in",
+        "q_add": "What to add?",
+        "exp": "Expense (Kharcha)",
+        "inc": "Income (Aamdani)",
+        "sav": "Savings (Bachat)",
+        "amt_label": "Enter Amount (₹)",
+        "cat_label": "Choose Category",
+        "details_label": "Where did you spend/save or source? (Details)",
+        "date_label": "Date",
+        "save_btn": "💾 SAVE ENTRY",
+        "chart_title": "🍕 Where was the money spent? (Colorful Pie Chart)",
+        "hist_title": "📜 History of this Month",
+        "del_title": "❌ Erase / Delete Wrong Entry",
+        "del_desc": "Look at the index number from the list above and select it below to delete:",
+        "del_select": "Which entry to delete?",
+        "del_btn": "🗑️ Remove Selected Entry",
+        "no_data": "No transactions saved in this month yet.",
+        "search_label": "Search by Description:",
+        "all_hist_title": "🔍 All Time Transaction History",
+        "all_no_data": "👋 No data entered yet."
+    },
+    "Hindi": {
+        "nav_title": "🧭 नेविगेशन मेनू",
+        "nav_dash": "📝 मंथली डैशबोर्ड",
+        "nav_hist": "🔍 कुल इतिहास और खोज",
+        "title": "💰 पर्सनल मंथली बजट ट्रैकर",
+        "select_month": "📅 किस महीने का हिसाब देखना है?",
+        "new_month": "🆕 नया महीना शुरू करें",
+        "new_month_btn": "➕ नया महीना पेज",
+        "new_month_input": "महीना-साल लिखें (जैसे Dec-2026):",
+        "create_btn": "शीट बनाएं",
+        "active_sheet": "📊 एक्टिव शीट:",
+        "bal_status": "💵 बैलेंस स्टेटस (इस महीने का)",
+        "total_inc": "💰 कुल आमदनी (Income)",
+        "total_exp": "📉 कुल खर्चा (Expense)",
+        "total_sav": "🏦 अलग की हुई बचत",
+        "clear_bal": "📊 क्लियर बैलेंस (खर्च के लिए बचा)",
+        "new_entry": "📝 नयी एंट्री डालें -",
+        "q_add": "क्या जोड़ना है?",
+        "exp": "Expense (खर्चा)",
+        "inc": "Income (आमदनी)",
+        "sav": "Savings (बचत)",
+        "amt_label": "अमाउंट भरें (₹)",
+        "cat_label": "कैटेगरी चुनें",
+        "details_label": "कहाँ खर्चा/बचत किया या पैसा आया? (विवरण)",
+        "date_label": "तारीख (Date)",
+        "save_btn": "💾 एंट्री सेव करें",
+        "chart_title": "🍕 इस महीने कहाँ कितना खर्चा हुआ? (कलरफुल चार्ट)",
+        "hist_title": "📜 इस महीने का इतिहास (History)",
+        "del_title": "❌ गलत एंट्री मिटाएं / डिलीट करें",
+        "del_desc": "ऊपर की लिस्ट में से जिस एंट्री को मिटाना है, उसका पहला नंबर (Index) देखकर नीचे चुनें:",
+        "del_select": "कौन सी एंट्री डिलीट करनी है?",
+        "del_btn": "🗑️ चुनी हुई एंट्री हटाओ",
+        "no_data": "इस महीने में अभी तक कोई ट्रांजैक्शन सेव नहीं है।",
+        "search_label": "विवरण (Description) से खोजें:",
+        "all_hist_title": "🔍 सभी महीनों का ट्रांजैक्शन इतिहास",
+        "all_no_data": "👋 अभी तक कोई डाटा नहीं डाला गया है।"
+    }
+}
 
-if page_selection == "📝 Monthly Dashboard":
-    st.title("💰 Personal Monthly Budget Tracker")
+# --- TOP LANGUAGE SELECTOR ---
+selected_lang = st.selectbox("🌐 Choose Language / भाषा चुनें", ["English", "Hindi"], index=1)
+t = lang_dict[selected_lang]
+
+# --- SIDEBAR NAVIGATION ---
+st.sidebar.markdown(f"<h2>{t['nav_title']}</h2>", unsafe_allow_html=True)
+page_selection = st.sidebar.radio("Go to Page:", [t["nav_dash"], t["nav_hist"]])
+
+if page_selection == t["nav_dash"]:
+    st.title(t["title"])
     
     all_months = load_months()
     col_m1, col_m2 = st.columns(2)
     with col_m1:
-        selected_month = st.selectbox("📅 Kis Mahine Ka Hisab Dekhna Hai?", all_months, index=len(all_months)-1)
+        selected_month = st.selectbox(t["select_month"], all_months, index=len(all_months)-1)
     with col_m2:
-        st.markdown("🆕 **Naya Mahina Shuru Karein**")
-        with st.popover("➕ Naya Month Page"):
-            new_month_input = st.text_input("Month-Year likhein (e.g. Dec-2026):")
-            if st.button("Create Sheet"):
+        st.markdown(t["new_month"])
+        with st.popover(t["new_month_btn"]):
+            new_month_input = st.text_input(t["new_month_input"])
+            if st.button(t["create_btn"]):
                 if new_month_input:
                     if add_new_month(new_month_input.strip()):
-                        st.success(f"{new_month_input} ki sheet ban gayi!")
+                        st.success(f"{new_month_input} added!")
                         st.rerun()
-                    else:
-                        st.warning("Yeh month pehle se maujood hai.")
 
-    st.markdown(f"## 📊 Active Sheet: {selected_month}")
+    st.markdown(f"## {t['active_sheet']} {selected_month}")
     
     # Data Calculations
     df_all = load_data()
@@ -104,26 +186,28 @@ if page_selection == "📝 Monthly Dashboard":
     total_expense = expense_df["Amount"].sum() if not expense_df.empty else 0.0
     total_savings = savings_df["Amount"].sum() if not savings_df.empty else 0.0
     
-    # Savings bhi Clear Balance mein se minus hogi
     clear_balance = total_income - total_expense - total_savings
 
     # Live Balance Metrics
-    st.subheader("💵 Balance Status (Is Mahine Ka)")
+    st.subheader(t["bal_status"])
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("💰 Total Income", f"₹{total_income:,.2f}")
-    c2.metric("📉 Total Kharcha", f"₹{total_expense:,.2f}")
-    c3.metric("🏦 Alag Ki Hui Bachat", f"₹{total_savings:,.2f}")
-    c4.metric("📊 Clear Balance (Bacha Paisa)", f"₹{clear_balance:,.2f}")
+    c1.metric(t["total_inc"], f"₹{total_income:,.2f}")
+    c2.metric(t["total_exp"], f"₹{total_expense:,.2f}")
+    c3.metric(t["total_sav"], f"₹{total_savings:,.2f}")
+    c4.metric(t["clear_bal"], f"₹{clear_balance:,.2f}")
 
     st.markdown("---")
 
     # Entry Form
-    st.subheader(f"📝 {selected_month} Mein Nayi Entry Dalein")
-    entry_type = st.radio("Kya jodna hai?", ["Expense (Kharcha)", "Income (Aamdani)", "Savings (Bachat)"], horizontal=True)
+    st.subheader(f"{t['new_entry']} {selected_month}")
+    
+    type_map = {t["exp"]: "Expense (Kharcha)", t["inc"]: "Income (Aamdani)", t["sav"]: "Savings (Bachat)"}
+    chosen_radio = st.radio(t["q_add"], [t["exp"], t["inc"], t["sav"]], horizontal=True)
+    entry_type = type_map[chosen_radio]
     
     col_amt, col_cat = st.columns(2)
     with col_amt:
-        amount = st.number_input("Amount Bharein (₹)", min_value=0.0, step=10.0, value=0.0)
+        amount = st.number_input(t["amt_label"], min_value=0.0, step=10.0, value=0.0)
     with col_cat:
         if entry_type == "Expense (Kharcha)":
             categories = ["Khana (Food)", "Rent/Makaan", "Travel/Petrol", "Shopping", "Recharge/Bills", "Others"]
@@ -131,56 +215,25 @@ if page_selection == "📝 Monthly Dashboard":
             categories = ["Emergency Fund", "Future Saving", "Bank Deposit", "Others"]
         else:
             categories = ["Salary", "Business", "Freelance", "Investment", "Others"]
-        category = st.selectbox("Category Chunein", categories)
+        category = st.selectbox(t["cat_label"], categories)
 
-    description = st.text_input("Kahan kharcha/bachat kiya ya paisa aaya? (Details)")
-    date_val = st.date_input("Tareekh (Date)", datetime.now())
+    description = st.text_input(t["details_label"])
+    date_val = st.date_input(t["date_label"], datetime.now())
 
-    if st.button("💾 ENTRY SAVE KAREIN", use_container_width=True):
+    if st.button(t["save_btn"], use_container_width=True):
         if amount > 0:
             save_data(selected_month, entry_type, amount, category, description, str(date_val))
-            st.success("Entry kamyabi se save ho gayi!")
+            st.success("Saved successfully!")
             st.rerun()
-        else:
-            st.error("Kripya 0 se bada amount dalein.")
 
     st.markdown("---")
 
-    # --- NEW CIRCLE (PIE) CHART SECTION ---
-    if not expense_df.empty:
-        st.subheader("🍕 Is Mahine Kahan Kitna Kharcha Hua? (Circle Chart)")
-        # Kharchon ka data Category ke hisab se group kar rahe hain
-        cat_chart_data = expense_df.groupby("Category")["Amount"].sum()
-        # Streamlit pie chart/circle visualization dikhane ke liye
-        st.pie_chart(cat_chart_data)
-        st.markdown("---")
-    
-    # History and Delete Feature
-    st.subheader(f"📜 {selected_month} Ka Itihas (History)")
-    if not df_month.empty:
-        display_df = df_month[["Type", "Amount", "Category", "Description", "Date"]].copy()
-        st.dataframe(display_df, use_container_width=True)
-        
-        with st.expander("❌ Galat Entry Mitayein / Delete Karein"):
-            st.write("Upar ki list mein se jis entry ko mitana hai, uska pehla no. (Index) dekh kar niche select karein:")
-            delete_index = st.selectbox("Kaun si entry delete karni hai?", df_month.index)
-            if st.button("🗑️ Selected Entry Hatao", type="primary"):
-                df_all = df_all.drop(delete_index)
-                df_all.to_csv(DATA_FILE, index=False)
-                st.success("Entry kamyabi se mita di gayi hai!")
-                st.rerun()
-    else:
-        st.info("Is mahine mein abhi tak koi transaction save nahi hai.")
-
-else:
-    st.title("🔍 All Time Transaction History")
-    df_data = load_data()
-    
-    if df_data.empty:
-        st.info("👋 Abhi tak koi data nahi dala gaya hai.")
-    else:
-        search_query = st.text_input("Description se khojein:")
-        filtered_df = df_data.copy()
-        if search_query:
-            filtered_df = filtered_df[filtered_df["Description"].str.contains(search_query, case=False, na=False)]
-        st.dataframe(filtered_df, use_container_width=True)
+    # --- COLORFUL PLOTLY PIE CHART ---
+    if not expense_df.empty and expense_df["Amount"].sum() > 0:
+        st.subheader(t["chart_title"])
+        cat_chart_data = expense_df.groupby("Category")["Amount"].sum().reset_index()
+        fig = px.pie(cat_chart_data, values='Amount', names='Category', 
+                     color_discrete_sequence=px.colors.qualitative.Pastel,
+                     hole=0.1)
+        fig.update_traces(textposition='inside', textinfo='percent+label', font_size=16)
+        fig.update_layout(showlegend=True, margin=dict(t=10, b=10, l=10, r=10))
