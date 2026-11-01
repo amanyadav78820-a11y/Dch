@@ -4,7 +4,7 @@ import os
 from datetime import datetime
 
 # Page Configuration
-st.set_page_config(page_title="Monthly Budget Planner", page_icon="💰", layout="wide")
+st.set_page_config(page_title="Monthly Budget & Savings Planner", page_icon="💰", layout="wide")
 
 # CSS to make text and input boxes BIGGER for easy mobile typing
 st.markdown("""
@@ -29,15 +29,14 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-DATA_FILE = "monthly_finance_data.csv"
-MONTHS_FILE = "available_months.txt"
+DATA_FILE = "monthly_finance_perfect_data.csv"
+MONTHS_FILE = "available_months_perfect.txt"
 
 # File setup if not exists
 if not os.path.exists(DATA_FILE):
     df = pd.DataFrame(columns=["Month_Sheet", "Type", "Amount", "Category", "Description", "Date"])
     df.to_csv(DATA_FILE, index=False)
 
-# Available months load aur save karne ke functions
 def load_months():
     current_month_str = datetime.now().strftime("%B-%Y")
     if os.path.exists(MONTHS_FILE):
@@ -68,21 +67,17 @@ def save_data(month_sheet, type_, amount, category, desc, date):
     df = pd.concat([df, new_row], ignore_index=True)
     df.to_csv(DATA_FILE, index=False)
 
-# --- APP NAVIGATION ---
-st.sidebar.markdown("## 🧭 Navigation Menu")
+# --- SIDEBAR NAVIGATION ---
+st.sidebar.markdown("<h2>🧭 Navigation</h2>", unsafe_allow_html=True)
 page_selection = st.sidebar.radio("Go to Page:", ["📝 Monthly Dashboard", "🔍 All Time History & Search"])
 
-# --- PAGE 1: MONTHLY DASHBOARD ---
 if page_selection == "📝 Monthly Dashboard":
-    st.title("💰 Personal Monthly Budget & Sheets")
+    st.title("💰 Personal Monthly Budget Tracker")
     
-    # Month Selector & New Month Add Option
     all_months = load_months()
-    
-    col_m1, col_m2 = st.columns([2, 1])
+    col_m1, col_m2 = st.columns(2)
     with col_m1:
         selected_month = st.selectbox("📅 Kis Mahine Ka Hisab Dekhna Hai?", all_months, index=len(all_months)-1)
-    
     with col_m2:
         st.markdown("🆕 **Naya Mahina Shuru Karein**")
         with st.popover("➕ Naya Month Page"):
@@ -94,34 +89,37 @@ if page_selection == "📝 Monthly Dashboard":
                         st.rerun()
                     else:
                         st.warning("Yeh month pehle se maujood hai.")
-                else:
-                    st.error("Kripya naam likhein.")
 
     st.markdown(f"## 📊 Active Sheet: {selected_month}")
     
-    # Current selected month ka data filter karna
+    # Data Calculations
     df_all = load_data()
     df_month = df_all[df_all["Month_Sheet"] == selected_month] if not df_all.empty else pd.DataFrame()
     
     income_df = df_month[df_month["Type"] == "Income (Aamdani)"] if not df_month.empty else pd.DataFrame()
     expense_df = df_month[df_month["Type"] == "Expense (Kharcha)"] if not df_month.empty else pd.DataFrame()
+    savings_df = df_month[df_month["Type"] == "Savings (Bachat)"] if not df_month.empty else pd.DataFrame()
 
     total_income = income_df["Amount"].sum() if not income_df.empty else 0.0
     total_expense = expense_df["Amount"].sum() if not expense_df.empty else 0.0
-    clear_balance = total_income - total_expense
+    total_savings = savings_df["Amount"].sum() if not savings_df.empty else 0.0
+    
+    # Savings bhi Clear Balance mein se minus hogi
+    clear_balance = total_income - total_expense - total_savings
 
-    # Live Balance Metrics for Selected Month
+    # Live Balance Metrics
     st.subheader("💵 Balance Status (Is Mahine Ka)")
-    c1, c2, c3 = st.columns(3)
+    c1, c2, c3, c4 = st.columns(4)
     c1.metric("💰 Total Income", f"₹{total_income:,.2f}")
     c2.metric("📉 Total Kharcha", f"₹{total_expense:,.2f}")
-    c3.metric("🏦 Clear Balance", f"₹{clear_balance:,.2f}")
+    c3.metric("🏦 Alag Ki Hui Bachat", f"₹{total_savings:,.2f}")
+    c4.metric("📊 Clear Balance (Bacha Paisa)", f"₹{clear_balance:,.2f}")
 
     st.markdown("---")
 
-    # Direct Entry Form
+    # Entry Form
     st.subheader(f"📝 {selected_month} Mein Nayi Entry Dalein")
-    entry_type = st.radio("Kya jodna hai?", ["Expense (Kharcha)", "Income (Aamdani)"], horizontal=True)
+    entry_type = st.radio("Kya jodna hai?", ["Expense (Kharcha)", "Income (Aamdani)", "Savings (Bachat)"], horizontal=True)
     
     col_amt, col_cat = st.columns(2)
     with col_amt:
@@ -129,37 +127,51 @@ if page_selection == "📝 Monthly Dashboard":
     with col_cat:
         if entry_type == "Expense (Kharcha)":
             categories = ["Khana (Food)", "Rent/Makaan", "Travel/Petrol", "Shopping", "Recharge/Bills", "Others"]
+        elif entry_type == "Savings (Bachat)":
+            categories = ["Emergency Fund", "Future Saving", "Bank Deposit", "Others"]
         else:
             categories = ["Salary", "Business", "Freelance", "Investment", "Others"]
         category = st.selectbox("Category Chunein", categories)
 
-    description = st.text_input("Kahan kharcha kiya / Kahan se paisa aaya? (Details likhein)")
+    description = st.text_input("Kahan kharcha/bachat kiya ya paisa aaya? (Details)")
     date_val = st.date_input("Tareekh (Date)", datetime.now())
 
     if st.button("💾 ENTRY SAVE KAREIN", use_container_width=True):
         if amount > 0:
             save_data(selected_month, entry_type, amount, category, description, str(date_val))
-            st.success(f"Entry kamyabi se {selected_month} ki sheet mein save ho gayi!")
+            st.success("Entry kamyabi se save ho gayi!")
             st.rerun()
         else:
             st.error("Kripya 0 se bada amount dalein.")
 
     st.markdown("---")
+
+    # --- NEW CIRCLE (PIE) CHART SECTION ---
+    if not expense_df.empty:
+        st.subheader("🍕 Is Mahine Kahan Kitna Kharcha Hua? (Circle Chart)")
+        # Kharchon ka data Category ke hisab se group kar rahe hain
+        cat_chart_data = expense_df.groupby("Category")["Amount"].sum()
+        # Streamlit pie chart/circle visualization dikhane ke liye
+        st.pie_chart(cat_chart_data)
+        st.markdown("---")
     
-    # Is Mahine ki History List
-    st.subheader(f"📜 {selected_month} Ka Kharcha Itihas (History)")
+    # History and Delete Feature
+    st.subheader(f"📜 {selected_month} Ka Itihas (History)")
     if not df_month.empty:
-        st.dataframe(df_month[["Date", "Type", "Amount", "Category", "Description"]].sort_index(ascending=False), use_container_width=True)
+        display_df = df_month[["Type", "Amount", "Category", "Description", "Date"]].copy()
+        st.dataframe(display_df, use_container_width=True)
         
-        # Charts for selected month
-        if not expense_df.empty:
-            st.markdown("#### 🍕 Is Mahine Kahan Kitna Kharcha Hua?")
-            cat_data = expense_df.groupby("Category")["Amount"].sum()
-            st.pie_chart(cat_data)
+        with st.expander("❌ Galat Entry Mitayein / Delete Karein"):
+            st.write("Upar ki list mein se jis entry ko mitana hai, uska pehla no. (Index) dekh kar niche select karein:")
+            delete_index = st.selectbox("Kaun si entry delete karni hai?", df_month.index)
+            if st.button("🗑️ Selected Entry Hatao", type="primary"):
+                df_all = df_all.drop(delete_index)
+                df_all.to_csv(DATA_FILE, index=False)
+                st.success("Entry kamyabi se mita di gayi hai!")
+                st.rerun()
     else:
         st.info("Is mahine mein abhi tak koi transaction save nahi hai.")
 
-# --- PAGE 2: ALL TIME HISTORY & SEARCH ---
 else:
     st.title("🔍 All Time Transaction History")
     df_data = load_data()
@@ -167,20 +179,8 @@ else:
     if df_data.empty:
         st.info("👋 Abhi tak koi data nahi dala gaya hai.")
     else:
-        st.subheader("🔎 Sabhi Mahino Ka Data Filter & Search")
-        search_query = st.text_input("Kahan kharcha kiya (Description) se search karein:")
-        
+        search_query = st.text_input("Description se khojein:")
         filtered_df = df_data.copy()
         if search_query:
             filtered_df = filtered_df[filtered_df["Description"].str.contains(search_query, case=False, na=False)]
-            
-        st.dataframe(filtered_df.sort_index(ascending=False), use_container_width=True)
-        
-        if st.button("🔴 Sabhi Mahino Ka Data Clear Karein", use_container_width=True):
-            if os.path.exists(DATA_FILE):
-                os.remove(DATA_FILE)
-            if os.path.exists(MONTHS_FILE):
-                os.remove(MONTHS_FILE)
-            st.success("Sabh data kamyabi se delete ho gaya...")
-            st.rerun()
-    
+        st.dataframe(filtered_df, use_container_width=True)
