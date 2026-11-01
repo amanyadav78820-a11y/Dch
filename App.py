@@ -237,3 +237,37 @@ if page_selection == t["nav_dash"]:
                      hole=0.1)
         fig.update_traces(textposition='inside', textinfo='percent+label', font_size=16)
         fig.update_layout(showlegend=True, margin=dict(t=10, b=10, l=10, r=10))
+        fig.update_layout(showlegend=True, margin=dict(t=10, b=10, l=10, r=10))
+        st.plotly_chart(fig, use_container_width=True)
+        st.markdown("---")
+
+    # History and Delete Feature
+    st.subheader(t["hist_title"])
+    if not df_month.empty:
+        display_df = df_month[["Type", "Amount", "Category", "Description", "Date"]].copy()
+        st.dataframe(display_df, use_container_width=True)
+        
+        with st.expander(t["del_title"]):
+            st.write(t["del_desc"])
+            delete_index = st.selectbox(t["del_select"], df_month.index)
+            if st.button(t["del_btn"], type="primary"):
+                df_all = df_all.drop(delete_index)
+                df_all.to_csv(DATA_FILE, index=False)
+                st.success("Deleted!")
+                st.rerun()
+    else:
+        st.info(t["no_data"])
+
+else:
+    st.title(t["all_hist_title"])
+    df_data = load_data()
+    
+    if df_data.empty:
+        st.info(t["all_no_data"])
+    else:
+        search_query = st.text_input(t["search_label"])
+        filtered_df = df_data.copy()
+        if search_query:
+            filtered_df = filtered_df[filtered_df["Description"].str.contains(search_query, case=False, na=False)]
+        st.dataframe(filtered_df, use_container_width=True)
+    
