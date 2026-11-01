@@ -237,4 +237,33 @@ if page_selection == t["nav_dash"]:
         
         fig, ax = plt.subplots(figsize=(6, 6))
         colors = ['#ff9999','#66b3ff','#99ff99','#ffcc99','#c2c2f0','#ffb3e6']
-    
+    ax.pie(cat_chart_data, labels=cat_chart_data.index, autopct='%1.1f%%', startangle=90, colors=colors, textprops={'fontsize': 14, 'weight': 'bold'})
+ax.axis('equal')
+st.pyplot(fig)
+st.markdown("---")
+# History and Delete Feature
+st.subheader(t["hist_title"])
+if not df_month.empty:
+display_df = df_month[["Type", "Amount", "Category", "Description", "Date"]].copy()
+st.dataframe(display_df, use_container_width=True)
+with st.expander(t["del_title"]):
+st.write(t["del_desc"])
+delete_index = st.selectbox(t["del_select"], df_month.index)
+if st.button(t["del_btn"], type="primary"):
+df_all = df_all.drop(delete_index)
+df_all.to_csv(DATA_FILE, index=False)
+st.success("Deleted!")
+st.rerun()
+else:
+st.info(t["no_data"])
+else:
+st.title(t["all_hist_title"])
+df_data = load_data()
+if df_data.empty:
+st.info(t["all_no_data"])
+else:
+search_query = st.text_input(t["search_label"])
+filtered_df = df_data.copy()
+if search_query:
+filtered_df = filtered_df[filtered_df["Description"].str.contains(search_query, case=False, na=False)]
+st.dataframe(filtered_df, use_container_width=True)
