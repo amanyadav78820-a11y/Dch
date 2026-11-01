@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 from datetime import datetime
-import plotly.express as px
+import matplotlib.pyplot as plt
 
 # Page Configuration
 st.set_page_config(page_title="Monthly Budget & Savings Planner", page_icon="💰", layout="wide")
@@ -97,7 +97,7 @@ lang_dict = {
         "details_label": "Where did you spend/save or source? (Details)",
         "date_label": "Date",
         "save_btn": "💾 SAVE ENTRY",
-        "chart_title": "🍕 Where was the money spent? (Colorful Pie Chart)",
+        "chart_title": "🍕 Where was the money spent? (Colorful Circle Chart)",
         "hist_title": "📜 History of this Month",
         "del_title": "❌ Erase / Delete Wrong Entry",
         "del_desc": "Look at the index number from the list above and select it below to delete:",
@@ -134,10 +134,10 @@ lang_dict = {
         "details_label": "कहाँ खर्चा/बचत किया या पैसा आया? (विवरण)",
         "date_label": "तारीख (Date)",
         "save_btn": "💾 एंट्री सेव करें",
-        "chart_title": "🍕 इस महीने कहाँ कितना खर्चा हुआ? (कलरफुल चार्ट)",
+        "chart_title": "🍕 इस महीने कहाँ कितना खर्चा हुआ? (कलरफुल गोल चार्ट)",
         "hist_title": "📜 इस महीने का इतिहास (History)",
         "del_title": "❌ गलत एंट्री मिटाएं / डिलीट करें",
-        "del_desc": "ऊपर की लिस्ट में से जिस एंट्री को मिटाना है, उसका पहला नंबर (Index) देखकर नीचे चुनें:",
+        "del_desc": "ऊपर की - लिस्ट में से जिस एंट्री को मिटाना है, उसका पहला नंबर (Index) देखकर नीचे चुनें:",
         "del_select": "कौन सी एंट्री डिलीट करनी है?",
         "del_btn": "🗑️ चुनी हुई एंट्री हटाओ",
         "no_data": "इस महीने में अभी तक कोई ट्रांजैक्शन सेव नहीं है।",
@@ -148,7 +148,7 @@ lang_dict = {
 }
 
 # --- TOP LANGUAGE SELECTOR ---
-selected_lang = st.selectbox("🌐 Choose Language / भाषा चुनें", ["English", "Hindi"], index=1)
+selected_lang = st.selectbox("🌐 Choose Language / भाषा चुनें", ["Hindi", "English"], index=0)
 t = lang_dict[selected_lang]
 
 # --- SIDEBAR NAVIGATION ---
@@ -228,46 +228,15 @@ if page_selection == t["nav_dash"]:
 
     st.markdown("---")
 
-    # --- COLORFUL PLOTLY PIE CHART ---
+    # --- 100% STABLE MATPLOTLIB COLORFUL PIE CHART ---
     if not expense_df.empty and expense_df["Amount"].sum() > 0:
         st.subheader(t["chart_title"])
-        cat_chart_data = expense_df.groupby("Category")["Amount"].sum().reset_index()
-        fig = px.pie(cat_chart_data, values='Amount', names='Category', 
-                     color_discrete_sequence=px.colors.qualitative.Pastel,
-                     hole=0.1)
-        fig.update_traces(textposition='inside', textinfo='percent+label', font_size=16)
-        fig.update_layout(showlegend=True, margin=dict(t=10, b=10, l=10, r=10))
-        fig.update_layout(showlegend=True, margin=dict(t=10, b=10, l=10, r=10))
-        st.plotly_chart(fig, use_container_width=True)
+        cat_chart_data = expense_df.groupby("Category")["Amount"].sum()
+        
+        fig, ax = plt.subplots(figsize=(6, 6))
+        colors = ['#ff9999','#66b3ff','#99ff99','#ffcc99','#c2c2f0','#ffb3e6']
+        ax.pie(cat_chart_data, labels=cat_chart_data.index, autopct='%1.1f%%', startangle=90, colors=colors, textprops={'fontsize': 14, 'weight': 'bold'})
+        ax.axis('equal')
+        st.pyplot(fig)
         st.markdown("---")
 
-    # History and Delete Feature
-    st.subheader(t["hist_title"])
-    if not df_month.empty:
-        display_df = df_month[["Type", "Amount", "Category", "Description", "Date"]].copy()
-        st.dataframe(display_df, use_container_width=True)
-        
-        with st.expander(t["del_title"]):
-            st.write(t["del_desc"])
-            delete_index = st.selectbox(t["del_select"], df_month.index)
-            if st.button(t["del_btn"], type="primary"):
-                df_all = df_all.drop(delete_index)
-                df_all.to_csv(DATA_FILE, index=False)
-                st.success("Deleted!")
-                st.rerun()
-    else:
-        st.info(t["no_data"])
-
-else:
-    st.title(t["all_hist_title"])
-    df_data = load_data()
-    
-    if df_data.empty:
-        st.info(t["all_no_data"])
-    else:
-        search_query = st.text_input(t["search_label"])
-        filtered_df = df_data.copy()
-        if search_query:
-            filtered_df = filtered_df[filtered_df["Description"].str.contains(search_query, case=False, na=False)]
-        st.dataframe(filtered_df, use_container_width=True)
-    
