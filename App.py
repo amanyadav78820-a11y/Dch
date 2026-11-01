@@ -99,8 +99,8 @@ lang_dict = {
         "save_btn": "💾 SAVE ENTRY",
         "chart_title": "🍕 Where was the money spent? (Colorful Circle Chart)",
         "hist_title": "📜 History of this Month",
-        "del_title": "❌ Erase / Delete Wrong Entry",
-        "del_desc": "Look at the index number from the list above and select it below to delete:",
+        "del_title": "❌ Erase / Delete Wrong Entry From History",
+        "del_desc": "Look at the index number from the list above and select it below to delete permanently:",
         "del_select": "Which entry to delete?",
         "del_btn": "🗑️ Remove Selected Entry",
         "no_data": "No transactions saved in this month yet.",
@@ -136,8 +136,8 @@ lang_dict = {
         "save_btn": "💾 एंट्री सेव करें",
         "chart_title": "🍕 इस महीने कहाँ कितना खर्चा हुआ? (कलरफुल गोल चार्ट)",
         "hist_title": "📜 इस महीने का इतिहास (History)",
-        "del_title": "❌ गलत एंट्री मिटाएं / डिलीट करें",
-        "del_desc": "ऊपर की - लिस्ट में से जिस एंट्री को मिटाना है, उसका पहला नंबर (Index) देखकर नीचे चुनें:",
+        "del_title": "❌ इतिहास से गलत एंट्री मिटाएं / डिलीट करें",
+        "del_desc": "ऊपर की लिस्ट में से जिस एंट्री को हमेशा के लिए मिटाना है, उसका पहला नंबर (Index) देखकर नीचे चुनें:",
         "del_select": "कौन सी एंट्री डिलीट करनी है?",
         "del_btn": "🗑️ चुनी हुई एंट्री हटाओ",
         "no_data": "इस महीने में अभी तक कोई ट्रांजैक्शन सेव नहीं है।",
@@ -217,26 +217,24 @@ if page_selection == t["nav_dash"]:
             categories = ["Salary", "Business", "Freelance", "Investment", "Others"]
         category = st.selectbox(t["cat_label"], categories)
 
-    description = st.text_input(t["details_label"])
+    description = st.text_input(t["details_label"], value="")
     date_val = st.date_input(t["date_label"], datetime.now())
 
-    if st.button(t["save_btn"], use_container_width=True):
+    if st.button(t["save_btn"], use_container_width=True, type="primary"):
         if amount > 0:
             save_data(selected_month, entry_type, amount, category, description, str(date_val))
             st.success("Saved successfully!")
             st.rerun()
+        else:
+            st.error("Please enter an amount greater than 0.")
 
     st.markdown("---")
 
-    # --- 100% STABLE MATPLOTLIB COLORFUL PIE CHART ---
+    # --- COLORFUL PIE CHART ---
     if not expense_df.empty and expense_df["Amount"].sum() > 0:
         st.subheader(t["chart_title"])
         cat_chart_data = expense_df.groupby("Category")["Amount"].sum()
         
         fig, ax = plt.subplots(figsize=(6, 6))
         colors = ['#ff9999','#66b3ff','#99ff99','#ffcc99','#c2c2f0','#ffb3e6']
-        ax.pie(cat_chart_data, labels=cat_chart_data.index, autopct='%1.1f%%', startangle=90, colors=colors, textprops={'fontsize': 14, 'weight': 'bold'})
-        ax.axis('equal')
-        st.pyplot(fig)
-        st.markdown("---")
-
+    
